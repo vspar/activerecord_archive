@@ -31,5 +31,5 @@ Order.restore('created_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)', prefix: 'my_arch
 ## Other Database Engines
 To the best of my knowledge the gem uses ANSI standard SQL so it should work with Postgres or similar but please note that the gem is only tested on MySQL.
 ## Table Relationships
-It is important to be aware that the gem only performs a simple copy therefore it does not take into account table/model relationships or foreign keys. If the tables you wish to archive contain foreign keys it is recommended to archive using the primary key (id) and archive child records first.
+It is important to be aware that the gem only performs a simple copy therefore it does not take into account table/model relationships or foreign keys. If the tables you wish to archive contain foreign keys it is recommended to archive the child records first using the foreign key of the parent table (e.g. order_id, if you are archiving order\_items), then archive the parent table using the primary key (id).
 

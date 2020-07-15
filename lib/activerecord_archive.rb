@@ -1,3 +1,76 @@
+module ArchiveMethods # :nodoc:
+  def do_archive(conditions, options = {})
+    options[:prefix] = 'ar_archive_' unless options[:prefix]
+    options[:prefix] = 'ar_archive_' if options[:prefix].blank?
+
+    if self.respond_to?(:table_name)
+      tabname = self.table_name
+    else
+      raise 'MissingTableName'
+    end
+
+    raise 'PrefixAndTableNameTooLong - maximum is 64 characters' if "#{options[:prefix]}#{tabname}".size > 64
+
+    # do a simple query first in case to cause an exception if there is an error in conditions
+    ActiveRecord::Base.connection.execute("
+      SELECT COUNT(*)
+      FROM #{tabname}
+      WHERE #{conditions}
+    ")
+
+    ActiveRecord::Base.connection.execute("
+      CREATE TABLE IF NOT EXISTS #{options[:prefix]}#{tabname}
+        LIKE #{tabname}
+    ")
+
+    ActiveRecord::Base.connection.execute("
+      INSERT INTO #{options[:prefix]}#{tabname}
+        SELECT * FROM #{tabname} WHERE #{conditions}
+    ")
+
+    ActiveRecord::Base.connection.execute("
+      DELETE FROM #{tabname}
+      WHERE EXISTS(
+        SELECT #{options[:prefix]}#{tabname}.id
+        FROM #{options[:prefix]}#{tabname}
+        WHERE #{options[:prefix]}#{tabname}.id = #{tabname}.id)
+    ")
+  end
+
+  def do_restore(conditions, options = {})
+    options[:prefix] = 'ar_archive_' unless options[:prefix]
+    options[:prefix] = 'ar_archive_' if options[:prefix].blank?
+
+    if self.respond_to?(:table_name)
+      tabname = self.table_name
+    else
+      raise 'MissingTableName'
+    end
+
+    raise 'PrefixAndTableNameTooLong - maximum is 64 characters' if "#{options[:prefix]}#{tabname}".size > 64
+
+    # do a simple query first in case to cause an exception if there is an error in conditions
+    ActiveRecord::Base.connection.execute("
+      SELECT COUNT(*)
+      FROM #{options[:prefix]}#{tabname}
+      WHERE #{conditions}
+    ")
+
+    ActiveRecord::Base.connection.execute("
+      INSERT INTO #{tabname}
+        SELECT * FROM #{options[:prefix]}#{tabname} WHERE #{conditions}
+    ")
+
+    ActiveRecord::Base.connection.execute("
+      DELETE FROM #{options[:prefix]}#{tabname}
+      WHERE EXISTS(
+        SELECT #{tabname}.id
+        FROM #{tabname}
+        WHERE #{tabname}.id = #{options[:prefix]}#{tabname}.id)
+    ")
+  end
+end
+
 if Rails::VERSION::MAJOR >= 3
   require 'active_support/concern'
 
@@ -5,6 +78,8 @@ if Rails::VERSION::MAJOR >= 3
     extend ActiveSupport::Concern
 
     class_methods do
+      include ArchiveMethods
+
       # Archive database records
       #
       # Caveats: where foreign keys are involved, child records must be archived first
@@ -18,39 +93,7 @@ if Rails::VERSION::MAJOR >= 3
       #   options:
       #     prefix: (String) - default "ar_archive_"
       def archive(conditions, options = {})
-        options[:prefix] = 'ar_archive_' unless options[:prefix]
-        options[:prefix] = 'ar_archive_' if options[:prefix].blank?
-
-        if self.respond_to?(:table_name)
-          tabname = self.table_name # >= Rails 3.x.x
-        else
-          raise 'MissingTableName', "Unable to determine table name for class #{self.to_s}"
-        end        
-
-        # do a simple query first in case to cause an exception if there is an error in conditions
-        ActiveRecord::Base.connection.execute("
-          SELECT COUNT(*)
-          FROM #{tabname}
-          WHERE #{conditions}
-        ")
-
-        ActiveRecord::Base.connection.execute("
-          CREATE TABLE IF NOT EXISTS #{options[:prefix]}#{tabname}
-            LIKE #{tabname}
-        ")
-
-        ActiveRecord::Base.connection.execute("
-          INSERT INTO #{options[:prefix]}#{tabname}
-            SELECT * FROM #{tabname} WHERE #{conditions}
-        ")
-
-        ActiveRecord::Base.connection.execute("
-          DELETE FROM #{tabname}
-          WHERE EXISTS(
-            SELECT #{options[:prefix]}#{tabname}.id
-            FROM #{options[:prefix]}#{tabname}
-            WHERE #{options[:prefix]}#{tabname}.id = #{tabname}.id)
-        ")
+        do_archive(conditions, options)
       end
 
       # Restore database records
@@ -66,111 +109,24 @@ if Rails::VERSION::MAJOR >= 3
       #   options:
       #     prefix: (String) - default "ar_archive_"
       def restore(conditions, options = {})
-        options[:prefix] = 'ar_archive_' unless options[:prefix]
-        options[:prefix] = 'ar_archive_' if options[:prefix].blank?
-
-        if self.respond_to?(:table_name)
-          tabname = self.table_name # >= Rails 3.x.x
-        elsif self.class.respond_to?(:table_name)
-          tabname = self.class.table_name # Rails 2.x.x
-        else
-          raise 'MissingTableName', "Unable to determine table name for class #{self.to_s}"
-        end        
-
-        # do a simple query first in case to cause an exception if there is an error in conditions
-        ActiveRecord::Base.connection.execute("
-          SELECT COUNT(*)
-          FROM #{options[:prefix]}#{tabname}
-          WHERE #{conditions}
-        ")
-
-        ActiveRecord::Base.connection.execute("
-          INSERT INTO #{tabname}
-            SELECT * FROM #{options[:prefix]}#{tabname} WHERE #{conditions}
-        ")
-
-        ActiveRecord::Base.connection.execute("
-          DELETE FROM #{options[:prefix]}#{tabname}
-          WHERE EXISTS(
-            SELECT #{tabname}.id
-            FROM #{tabname}
-            WHERE #{tabname}.id = #{options[:prefix]}#{tabname}.id)
-        ")
+        do_restore(conditions, options)
       end
     end
   end
 
-  # include the extension 
+  # include the extension
   ActiveRecord::Base.send(:include, ActiveRecordArchive)
 else
+  # Rails 2
   class ActiveRecord::Base # :nodoc:
+    extend ArchiveMethods
+
     def self.archive(conditions, options = {})
-      options[:prefix] = 'ar_archive_' unless options[:prefix]
-      options[:prefix] = 'ar_archive_' if options[:prefix].blank?
-
-      if self.class.respond_to?(:table_name)
-        tabname = self.class.table_name # Rails 2.x.x
-      else
-        raise 'MissingTableName', "Unable to determine table name for class #{self.to_s}"
-      end        
-
-      # do a simple query first in case to cause an exception if there is an error in conditions
-      ActiveRecord::Base.connection.execute("
-        SELECT COUNT(*)
-        FROM #{tabname}
-        WHERE #{conditions}
-      ")
-
-      ActiveRecord::Base.connection.execute("
-        CREATE TABLE IF NOT EXISTS #{options[:prefix]}#{tabname}
-          LIKE #{tabname}
-      ")
-
-      ActiveRecord::Base.connection.execute("
-        INSERT INTO #{options[:prefix]}#{tabname}
-          SELECT * FROM #{tabname} WHERE #{conditions}
-      ")
-
-      ActiveRecord::Base.connection.execute("
-        DELETE FROM #{tabname}
-        WHERE EXISTS(
-          SELECT #{options[:prefix]}#{tabname}.id
-          FROM #{options[:prefix]}#{tabname}
-          WHERE #{options[:prefix]}#{tabname}.id = #{tabname}.id)
-      ")
+      do_archive(conditions, options)
     end
 
     def self.restore(conditions, options = {})
-      options[:prefix] = 'ar_archive_' unless options[:prefix]
-      options[:prefix] = 'ar_archive_' if options[:prefix].blank?
-
-      if self.respond_to?(:table_name)
-        tabname = self.table_name # >= Rails 3.x.x
-      elsif self.class.respond_to?(:table_name)
-        tabname = self.class.table_name # Rails 2.x.x
-      else
-        raise 'MissingTableName', "Unable to determine table name for class #{self.to_s}"
-      end        
-
-      # do a simple query first in case to cause an exception if there is an error in conditions
-      ActiveRecord::Base.connection.execute("
-        SELECT COUNT(*)
-        FROM #{options[:prefix]}#{tabname}
-        WHERE #{conditions}
-      ")
-
-      ActiveRecord::Base.connection.execute("
-        INSERT INTO #{tabname}
-          SELECT * FROM #{options[:prefix]}#{tabname} WHERE #{conditions}
-      ")
-
-      ActiveRecord::Base.connection.execute("
-        DELETE FROM #{options[:prefix]}#{tabname}
-        WHERE EXISTS(
-          SELECT #{tabname}.id
-          FROM #{tabname}
-          WHERE #{tabname}.id = #{options[:prefix]}#{tabname}.id)
-      ")
+      do_restore(conditions, options)
     end
   end
 end

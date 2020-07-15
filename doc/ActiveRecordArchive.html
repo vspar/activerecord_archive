@@ -147,41 +147,9 @@ options:
 
           
           <div class="method-source-code" id="archive-source">
-            <pre><span class="ruby-comment"># File lib/activerecord_archive.rb, line 20</span>
+            <pre><span class="ruby-comment"># File lib/activerecord_archive.rb, line 95</span>
 <span class="ruby-keyword">def</span> <span class="ruby-identifier ruby-title">archive</span>(<span class="ruby-identifier">conditions</span>, <span class="ruby-identifier">options</span> = {})
-  <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>] = <span class="ruby-string">&#39;ar_archive_&#39;</span> <span class="ruby-keyword">unless</span> <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>]
-  <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>] = <span class="ruby-string">&#39;ar_archive_&#39;</span> <span class="ruby-keyword">if</span> <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>].<span class="ruby-identifier">blank?</span>
-
-  <span class="ruby-keyword">if</span> <span class="ruby-keyword">self</span>.<span class="ruby-identifier">respond_to?</span>(<span class="ruby-value">:table_name</span>)
-    <span class="ruby-identifier">tabname</span> = <span class="ruby-keyword">self</span>.<span class="ruby-identifier">table_name</span> <span class="ruby-comment"># &gt;= Rails 3.x.x</span>
-  <span class="ruby-keyword">else</span>
-    <span class="ruby-identifier">raise</span> <span class="ruby-string">&#39;MissingTableName&#39;</span>, <span class="ruby-node">&quot;Unable to determine table name for class #{self.to_s}&quot;</span>
-  <span class="ruby-keyword">end</span>        
-
-  <span class="ruby-comment"># do a simple query first in case to cause an exception if there is an error in conditions</span>
-  <span class="ruby-constant">ActiveRecord</span><span class="ruby-operator">::</span><span class="ruby-constant">Base</span>.<span class="ruby-identifier">connection</span>.<span class="ruby-identifier">execute</span>(<span class="ruby-node">&quot;
-    SELECT COUNT(*)
-    FROM #{tabname}
-    WHERE #{conditions}
-  &quot;</span>)
-
-  <span class="ruby-constant">ActiveRecord</span><span class="ruby-operator">::</span><span class="ruby-constant">Base</span>.<span class="ruby-identifier">connection</span>.<span class="ruby-identifier">execute</span>(<span class="ruby-node">&quot;
-    CREATE TABLE IF NOT EXISTS #{options[:prefix]}#{tabname}
-      LIKE #{tabname}
-  &quot;</span>)
-
-  <span class="ruby-constant">ActiveRecord</span><span class="ruby-operator">::</span><span class="ruby-constant">Base</span>.<span class="ruby-identifier">connection</span>.<span class="ruby-identifier">execute</span>(<span class="ruby-node">&quot;
-    INSERT INTO #{options[:prefix]}#{tabname}
-      SELECT * FROM #{tabname} WHERE #{conditions}
-  &quot;</span>)
-
-  <span class="ruby-constant">ActiveRecord</span><span class="ruby-operator">::</span><span class="ruby-constant">Base</span>.<span class="ruby-identifier">connection</span>.<span class="ruby-identifier">execute</span>(<span class="ruby-node">&quot;
-    DELETE FROM #{tabname}
-    WHERE EXISTS(
-      SELECT #{options[:prefix]}#{tabname}.id
-      FROM #{options[:prefix]}#{tabname}
-      WHERE #{options[:prefix]}#{tabname}.id = #{tabname}.id)
-  &quot;</span>)
+  <span class="ruby-identifier">do_archive</span>(<span class="ruby-identifier">conditions</span>, <span class="ruby-identifier">options</span>)
 <span class="ruby-keyword">end</span></pre>
           </div>
           
@@ -225,38 +193,9 @@ options:
 
           
           <div class="method-source-code" id="restore-source">
-            <pre><span class="ruby-comment"># File lib/activerecord_archive.rb, line 68</span>
+            <pre><span class="ruby-comment"># File lib/activerecord_archive.rb, line 111</span>
 <span class="ruby-keyword">def</span> <span class="ruby-identifier ruby-title">restore</span>(<span class="ruby-identifier">conditions</span>, <span class="ruby-identifier">options</span> = {})
-  <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>] = <span class="ruby-string">&#39;ar_archive_&#39;</span> <span class="ruby-keyword">unless</span> <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>]
-  <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>] = <span class="ruby-string">&#39;ar_archive_&#39;</span> <span class="ruby-keyword">if</span> <span class="ruby-identifier">options</span>[<span class="ruby-value">:prefix</span>].<span class="ruby-identifier">blank?</span>
-
-  <span class="ruby-keyword">if</span> <span class="ruby-keyword">self</span>.<span class="ruby-identifier">respond_to?</span>(<span class="ruby-value">:table_name</span>)
-    <span class="ruby-identifier">tabname</span> = <span class="ruby-keyword">self</span>.<span class="ruby-identifier">table_name</span> <span class="ruby-comment"># &gt;= Rails 3.x.x</span>
-  <span class="ruby-keyword">elsif</span> <span class="ruby-keyword">self</span>.<span class="ruby-identifier">class</span>.<span class="ruby-identifier">respond_to?</span>(<span class="ruby-value">:table_name</span>)
-    <span class="ruby-identifier">tabname</span> = <span class="ruby-keyword">self</span>.<span class="ruby-identifier">class</span>.<span class="ruby-identifier">table_name</span> <span class="ruby-comment"># Rails 2.x.x</span>
-  <span class="ruby-keyword">else</span>
-    <span class="ruby-identifier">raise</span> <span class="ruby-string">&#39;MissingTableName&#39;</span>, <span class="ruby-node">&quot;Unable to determine table name for class #{self.to_s}&quot;</span>
-  <span class="ruby-keyword">end</span>        
-
-  <span class="ruby-comment"># do a simple query first in case to cause an exception if there is an error in conditions</span>
-  <span class="ruby-constant">ActiveRecord</span><span class="ruby-operator">::</span><span class="ruby-constant">Base</span>.<span class="ruby-identifier">connection</span>.<span class="ruby-identifier">execute</span>(<span class="ruby-node">&quot;
-    SELECT COUNT(*)
-    FROM #{options[:prefix]}#{tabname}
-    WHERE #{conditions}
-  &quot;</span>)
-
-  <span class="ruby-constant">ActiveRecord</span><span class="ruby-operator">::</span><span class="ruby-constant">Base</span>.<span class="ruby-identifier">connection</span>.<span class="ruby-identifier">execute</span>(<span class="ruby-node">&quot;
-    INSERT INTO #{tabname}
-      SELECT * FROM #{options[:prefix]}#{tabname} WHERE #{conditions}
-  &quot;</span>)
-
-  <span class="ruby-constant">ActiveRecord</span><span class="ruby-operator">::</span><span class="ruby-constant">Base</span>.<span class="ruby-identifier">connection</span>.<span class="ruby-identifier">execute</span>(<span class="ruby-node">&quot;
-    DELETE FROM #{options[:prefix]}#{tabname}
-    WHERE EXISTS(
-      SELECT #{tabname}.id
-      FROM #{tabname}
-      WHERE #{tabname}.id = #{options[:prefix]}#{tabname}.id)
-  &quot;</span>)
+  <span class="ruby-identifier">do_restore</span>(<span class="ruby-identifier">conditions</span>, <span class="ruby-identifier">options</span>)
 <span class="ruby-keyword">end</span></pre>
           </div>
           

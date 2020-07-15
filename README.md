@@ -4,7 +4,7 @@ A simple archiving extension for ActiveRecord. Archive old records to improve da
 ## Installation
 Download the folder and install the gem as follows:
 ```
-gem install activerecord_archive-1.0.0.gem
+gem install activerecord_archive
 ```
 Simply add the following line to your Gemfile:
 ```

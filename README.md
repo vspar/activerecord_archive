@@ -25,9 +25,15 @@ In the above example, orders will be added to the table **ar_archive_orders**. I
 
 If you wish you can specify your own archive table prefix but remember not to exceed the maximum table name length for prefix + table name (at the time of writing 64 characters in MySQL):
 ```
-Order.archive('created_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)', prefix: 'my_archived_')
-Order.restore('created_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)', prefix: 'my_archived_')
+Order.archive('id <= 10', prefix: 'my_archived_')
+Order.restore('id <= 10', prefix: 'my_archived_')
 ```
+You may also use other criteria to archive and restore, however, watch out for criteria which change over time, e.g.:
+```
+Order.archive('created_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)')
+Order.restore('created_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)')
+```
+In the above example the restored records set will likely be different from the archived records set. This is because the reference point for archiving and restoring is time-dependent. 
 ## Other Database Engines
 To the best of my knowledge the gem uses ANSI standard SQL so it should work with Postgres or similar but please note that the gem is only tested on MySQL.
 ## Table Relationships

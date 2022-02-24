@@ -30,6 +30,18 @@ module ArchiveMethods # :nodoc:
         SELECT * FROM #{tabname} WHERE #{conditions}
     ")
 
+    if options[:recursive_foreign_key] && !options[:recursive_foreign_key].blank?
+      # for self-referencing foreign keys, delete child records first
+      # delete only records in parent table where ids match those in archive table
+      ActiveRecord::Base.connection.execute("
+        DELETE FROM #{tabname}
+        WHERE #{tabname}.#{options[:recursive_foreign_key]} IS NOT NULL AND EXISTS(
+          SELECT #{options[:prefix]}#{tabname}.id
+          FROM #{options[:prefix]}#{tabname}
+          WHERE #{options[:prefix]}#{tabname}.id = #{tabname}.id)
+      ")
+    end
+
     # delete only records in parent table where ids match those in archive table
     ActiveRecord::Base.connection.execute("
       DELETE FROM #{tabname}
@@ -60,11 +72,25 @@ module ArchiveMethods # :nodoc:
       WHERE #{conditions}
     ")
 
-    # use replace into in case of duplicate inserts
-    ActiveRecord::Base.connection.execute("
+    if options[:recursive_foreign_key] && !options[:recursive_foreign_key].blank?
+      # use replace into in case of duplicate inserts
+      # for self-referencing foreign keys, insert parent records first
+      ActiveRecord::Base.connection.execute("
+      REPLACE INTO #{tabname}
+        SELECT * FROM #{options[:prefix]}#{tabname} WHERE (#{conditions}) AND #{options[:prefix]}#{tabname}.#{options[:recursive_foreign_key]} IS NULL
+      ")
+      # now insert child records
+      ActiveRecord::Base.connection.execute("
+      REPLACE INTO #{tabname}
+        SELECT * FROM #{options[:prefix]}#{tabname} WHERE (#{conditions}) AND #{options[:prefix]}#{tabname}.#{options[:recursive_foreign_key]} IS NOT NULL
+      ")
+    else
+      # use replace into in case of duplicate inserts
+      ActiveRecord::Base.connection.execute("
       REPLACE INTO #{tabname}
         SELECT * FROM #{options[:prefix]}#{tabname} WHERE #{conditions}
-    ")
+      ")
+    end
 
     # delete only records in archive table where ids match those in parent table
     ActiveRecord::Base.connection.execute("

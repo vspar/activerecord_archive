@@ -10,6 +10,7 @@ module ArchiveMethods # :nodoc:
     end
 
     raise 'PrefixAndTableNameTooLong - maximum is 64 characters' if "#{options[:prefix]}#{tabname}".size > 64
+    raise 'PrimaryKey id expected but not found' unless self.primary_key == 'id'
 
     # do a simple query first in case to cause an exception if there is an error in conditions
     ActiveRecord::Base.connection.execute("
@@ -23,11 +24,13 @@ module ArchiveMethods # :nodoc:
         LIKE #{tabname}
     ")
 
+    # use replace into in case of duplicate inserts
     ActiveRecord::Base.connection.execute("
-      INSERT INTO #{options[:prefix]}#{tabname}
+      REPLACE INTO #{options[:prefix]}#{tabname}
         SELECT * FROM #{tabname} WHERE #{conditions}
     ")
 
+    # delete only records in parent table where ids match those in archive table
     ActiveRecord::Base.connection.execute("
       DELETE FROM #{tabname}
       WHERE EXISTS(
@@ -48,6 +51,7 @@ module ArchiveMethods # :nodoc:
     end
 
     raise 'PrefixAndTableNameTooLong - maximum is 64 characters' if "#{options[:prefix]}#{tabname}".size > 64
+    raise 'PrimaryKey id expected but not found' unless self.primary_key == 'id'
 
     # do a simple query first in case to cause an exception if there is an error in conditions
     ActiveRecord::Base.connection.execute("
@@ -56,11 +60,13 @@ module ArchiveMethods # :nodoc:
       WHERE #{conditions}
     ")
 
+    # use replace into in case of duplicate inserts
     ActiveRecord::Base.connection.execute("
-      INSERT INTO #{tabname}
+      REPLACE INTO #{tabname}
         SELECT * FROM #{options[:prefix]}#{tabname} WHERE #{conditions}
     ")
 
+    # delete only records in archive table where ids match those in parent table
     ActiveRecord::Base.connection.execute("
       DELETE FROM #{options[:prefix]}#{tabname}
       WHERE EXISTS(

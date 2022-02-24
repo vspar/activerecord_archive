@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'activerecord_archive'
-  s.version = '1.0.3'
+  s.version = '1.0.4'
   s.date = '2022-02-24'
   s.summary = "ActiveRecord Archiving"
   s.description = "A simple archiving extension for ActiveRecord. Archive old records to improve database performance. Restore old records from archive tables."
